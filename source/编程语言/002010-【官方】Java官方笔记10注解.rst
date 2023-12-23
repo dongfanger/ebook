@@ -1,0 +1,274 @@
+【官方】Java官方笔记10注解
+==========================
+
+|image1|
+
+注解
+~~~~
+
+注解的作用：
+
+-  Information for the compiler — Annotations can be used by the
+   compiler to detect errors or suppress warnings.
+-  Compile-time and deployment-time processing — Software tools can
+   process annotation information to generate code, XML files, and so
+   forth.
+-  Runtime processing — Some annotations are available to be examined at
+   runtime.
+
+注解格式，使用\ ``@``\ ：
+
+.. code:: java
+
+   @Entity
+
+带key-value：
+
+.. code:: java
+
+   @Author(
+      name = "Benjamin Franklin",
+      date = "3/27/2003"
+   )
+   class MyClass { ... }
+
+只有1个key时可以省略key：
+
+.. code:: java
+
+   @SuppressWarnings(value = "unchecked")
+   void myMethod() { ... }
+
+.. code:: java
+
+   @SuppressWarnings("unchecked")
+   void myMethod() { ... }
+
+同时使用多个注解：
+
+.. code:: java
+
+   @Author(name = "Jane Doe")
+   @EBook
+   class MyClass { ... }
+
+The annotation type can be one of the types that are defined in
+the ```java.lang`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/package-summary.html>`__ or ```java.lang.annotation`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/package-summary.html>`__ packages
+of the Java SE API.
+
+哪里能用注解
+~~~~~~~~~~~~
+
+① Annotations can be applied to **declarations: declarations of classes,
+fields, methods, and other program elements.**
+
+② Java SE 8，annotations can also be applied to **the use of types**\ ：
+
+-  Class instance creation expression:
+
+   .. code:: java
+
+      new @Interned MyObject();
+
+-  Type cast:
+
+   .. code:: java
+
+      myString = (@NonNull String) str;
+
+-  implements clause:
+
+   .. code:: java
+
+      class UnmodifiableList<T> implements
+        @Readonly List<@Readonly T> { ... }
+
+-  Thrown exception declaration:
+
+   .. code:: java
+
+      void monitorTemperature() throws
+        @Critical TemperatureException { ... }
+
+自定义注解
+~~~~~~~~~~
+
+使用\ ``@interface``\ ：
+
+.. code:: java
+
+   @interface ClassPreamble {
+      String author();
+      String date();
+      int currentRevision() default 1;
+      String lastModified() default "N/A";
+      String lastModifiedBy() default "N/A";
+      // Note use of array
+      String[] reviewers();
+   }
+
+注解其实也是一种接口，只是要使用\ ``@``\ 来声明。
+
+使用：
+
+.. code:: java
+
+   @ClassPreamble (
+      author = "John Doe",
+      date = "3/17/2002",
+      currentRevision = 6,
+      lastModified = "4/12/2004",
+      lastModifiedBy = "Jane Doe",
+      // Note array notation
+      reviewers = {"Alice", "Bob", "Cindy"}
+   )
+   public class Generation3List extends Generation2List {
+
+   // class code goes here
+
+   }
+
+Java预置注解
+~~~~~~~~~~~~
+
+@Deprecated
+
+.. code:: java
+
+   // Javadoc comment follows
+   /**
+    * @deprecated
+    * explanation of why it was deprecated
+    */
+   @Deprecated
+   static void deprecatedMethod() { }
+
+@Override
+
+.. code:: java
+
+   // mark method as a superclass method
+   // that has been overridden
+   @Override 
+   int overriddenMethod() { }
+
+@SuppressWarnings
+
+.. code:: java
+
+   // use a deprecated method and tell 
+   // compiler not to generate a warning
+   @SuppressWarnings("deprecation")
+   void useDeprecatedMethod() {
+       // deprecation warning
+       // - suppressed
+       objectOne.deprecatedMethod();
+   }
+
+@SafeVarargs
+
+@FunctionalInterface
+
+注解上的注解：Annotations that apply to other annotations are called
+**meta-annotations**. There are several meta-annotation types defined
+in ```java.lang.annotation`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/package-summary.html>`__.
+
+@Retention
+
+-  ```RetentionPolicy.SOURCE`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/RetentionPolicy.html#SOURCE>`__ –
+   The marked annotation is retained only in the source level and is
+   ignored by the compiler.
+-  ```RetentionPolicy.CLASS`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/RetentionPolicy.html#CLASS>`__ –
+   The marked annotation is retained by the compiler at compile time,
+   but is ignored by the Java Virtual Machine (JVM).
+-  ```RetentionPolicy.RUNTIME`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/RetentionPolicy.html#RUNTIME>`__ –
+   The marked annotation is retained by the JVM so it can be used by the
+   runtime environment.
+
+@Documented
+
+@Target
+
+-  ```ElementType.ANNOTATION_TYPE`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#ANNOTATION_TYPE>`__ can
+   be applied to an annotation type.
+-  ```ElementType.CONSTRUCTOR`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#CONSTRUCTOR>`__ can
+   be applied to a constructor.
+-  ```ElementType.FIELD`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#FIELD>`__ can
+   be applied to a field or property.
+-  ```ElementType.LOCAL_VARIABLE`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#LOCAL_VARIABLE>`__ can
+   be applied to a local variable.
+-  ```ElementType.METHOD`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#METHOD>`__ can
+   be applied to a method-level annotation.
+-  ```ElementType.MODULE`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#MODULE>`__ can
+   be applied to a module declaration.
+-  ```ElementType.PACKAGE`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#PACKAGE>`__ can
+   be applied to a package declaration.
+-  ```ElementType.PARAMETER`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#PARAMETER>`__ can
+   be applied to the parameters of a method.
+-  ```ElementType.RECORD_COMPONENT`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#RECORD_COMPONENT>`__ can
+   be applied to the component of a record.
+-  ```ElementType.TYPE`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#TYPE>`__ can
+   be applied to the declaration of a class, an abtract class, an
+   interface, an annotation interface, an enumeration, or a record
+   declaration.
+-  ```ElementType.TYPE_PARAMETER`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#TYPE_PARAMETER>`__ can
+   be applied on the parameters of a type.
+-  ```ElementType.TYPE_USE`` <https://docs.oracle.com/en/java/javase/20/docs/api/java.base/java/lang/annotation/ElementType.html#TYPE_USE>`__ can
+   be applied where a type is used, for instance on the declaration of a
+   field.
+
+@Inherited
+
+@Repeatable
+
+重复注解也是允许的：
+
+.. code:: java
+
+   @Schedule(dayOfMonth="last")
+   @Schedule(dayOfWeek="Fri", hour="23")
+   public void doPeriodicCleanup() { ... }
+
+重复注解的定义要用到@Repeatable：
+
+.. code:: java
+
+   @Repeatable(Schedules.class)
+   public @interface Schedule {
+     String dayOfMonth() default "first";
+     String dayOfWeek() default "Mon";
+     int hour() default 12;
+   }
+
+并且，The containing annotation type must have a ``value`` element with
+an array type：
+
+.. code:: java
+
+   public @interface Schedules {
+       Schedule[] value();
+   }
+
+the containing annotation type is ``@Schedules``, so
+repeating ``@Schedule`` annotations is stored in
+an ``@Schedules`` annotation.
+
+``Schedule[] value()``\ 是一个没有参数、返回类型为\ ``Schedule[]``\ 的方法的声明，它是一个抽象方法。事实上，这个方法声明是用来定义注解的属性的，与普通方法不同的是，它没有方法体，只有方法声明，而方法的具体实现则由使用该注解的代码来完成。在使用该注解时，也可以通过指定该属性的值来进行赋值操作，例如：
+
+.. code:: java
+
+   @Schedules({
+           @Schedule(dayOfMonth="last"),
+           @Schedule(dayOfWeek="Fri", hour="23")
+   })
+   public class MyScheduledTask {
+       // ...
+   }
+
+在上述代码中，我们使用了@Schedules注解，并且指定了它的value属性，也就是给\ ``Schedule[] value()``\ 方法赋上相应的值。注意到，该属性的值是一个注解数组，因此需要使用大括号\ ``{}``\ 将多个注解组合起来。
+
+   参考资料：
+
+   Annotations https://dev.java/learn/annotations/
+
+.. |image1| image:: ../wanggang.png

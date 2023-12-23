@@ -1,0 +1,759 @@
+【开源平台】学习版pytest内核测试平台开发万字长文入门篇
+======================================================
+
+|image1|
+
+前言
+----
+
+2021年，测试平台如雨后春笋般冒了出来，我就是其中一员，写了一款pytest内核测试平台，在公司落地。分享出来后，有同学觉得挺不错，希望能开源，本着“公司代码不要传到网上去，以免引起不必要麻烦”的原则，只能在家从头写一个，边重新梳理代码边温习巩固知识点，以学习交流为目的，定义为“学习版”。
+
+功能展示
+--------
+
+登录
+~~~~
+
+|image2|
+
+接口自动化
+~~~~~~~~~~
+
+接口自动化–Dashboard：
+
+|image3|
+
+接口自动化–环境变量：
+
+|image4|
+
+接口自动化–fixtures：
+
+|image5|
+
+接口自动化–用例管理：
+
+|image6|
+
+接口自动化–用例管理–编辑用例：
+
+|image7|
+
+接口自动化–测试计划：
+
+|image8|
+
+接口自动化–语法说明：
+
+|image9|
+
+小工具
+~~~~~~
+
+小工具–共享脚本：
+
+|image10|
+
+小工具–HTTP状态查询：
+
+|image11|
+
+后台管理
+~~~~~~~~
+
+后台管理–用户管理
+
+|image12|
+
+后台管理–项目管理
+
+|image13|
+
+本文开发内容
+------------
+
+-  登录，登出
+-  首页，修改密码，个人信息
+-  后台管理，用户管理
+-  JWT认证
+
+本文先打个基础，既是测试平台基本结构，也可以作为CMS基础框架，定制开发各种小型项目。
+
+技术栈
+------
+
+-  Node.js 12.16.3
+-  Vue 4.5.11
+-  Python 3.8
+-  Django 3.1.3
+-  Django REST framework 3.12.2
+-  SQLite 3
+
+IDE编辑器推荐PyCharm旗舰版，既能写Django也能写Vue项目。数据库使用Django自带SQLite
+，省去安装MySQL和Navicat/Workbench麻烦，轻量级开发。SQLiteStudio为SQLite数据库可视化工具，只需要下载即可，无需安装，解压就用：：
+
+https://sqlitestudio.pl/
+
+|image14|
+
+由于会用到\ ``models.JSONField``\ ，SQLite默认不兼容，所以需要下载\ ``sqlite3.dll``\ 文件替换下：
+
+https://www.sqlite.org/download.html
+
+根据Python版本选择，比如我的windows安装的Python38-32，下载了\ ``sqlite-dll-win32-x86-3340100.zip``\ 这个软件包，解压后将\ ``D:\Program Files (x86)\Python38-32\DLLs\sqlite3.dll``\ 替换。
+
+创建Vue项目
+-----------
+
+设置\ ``npm``\ 淘宝镜像：
+
+.. code:: shell
+
+   npm config set registry https://registry.npm.taobao.org
+
+安装\ ``Vue CLI``\ ：
+
+.. code:: shell
+
+   npm install -g @vue/cli
+
+创建\ ``teprunner-frontend``\ 项目：
+
+.. code:: shell
+
+   vue create teprunner-frontend
+
+..
+
+   项目名字请随意。
+
+默认选项点击回车进行创建：
+
+|image15|
+
+编写Vue代码
+-----------
+
+添加静态资源：
+
+|image16|
+
+包括css样式、字体样式、图标、logo。
+
+   推荐一个图标下载网站：https://www.easyicon.net/。
+
+编辑\ ``package.json``\ ，安装项目所需依赖：
+
+|image17|
+
+``axios``\ 用于异步请求，发送\ ``http``\ 给后端。\ ``element-ui``\ 为饿了么开源前端框架，简化了从头写html麻烦，高度复用，统一风格。\ ``vue-router``\ 提供了路由跳转，在上个时代，路由是在后端来控制的，把页面渲染后返回给前端直接展示，前后端分离后，后端只负责返回数据，把控制权交给前端。
+
+``devDependencies``\ 是写代码用到的依赖，这里把\ ``eslint``\ 和\ ``prettier``\ 标出来了，它们是用来做代码静态检查的，配置后能给与代码规范提示，帮你写出更漂亮的代码，同样是在\ ``package.json``\ 文件编辑：
+
+|image18|
+
+接着执行\ ``npm install``\ 进行安装。有可能会出现下图提示：
+
+|image19|
+
+执行\ ``npm audit fix``\ 就修复好了：
+
+|image20|
+
+新建\ ``vue.config.js``\ 文件，添加Vue项目配置：
+
+|image21|
+
+``args[0].title``\ 给网页设置了浏览器title。\ ``proxy``\ 指定了后端接口根路径为\ ``/api``\ ，后端服务器访问地址为\ ``http://127.0.0.1:8000/``\ ，这是Django启动后默认本地域名和端口。\ ``element-ui``\ 默认页面是会出现滚动条的，在登录页会显得很丑，需要在\ ``public/index.html``\ 加上样式：
+
+|image22|
+
+Vue程序执行入口是\ ``main.js``\ ，把需要初始化加载的代码写在这里：
+
+|image23|
+
+app会挂载到\ ``index.html``\ 文件中\ ``div``\ ：
+
+|image24|
+
+这是整个Vue项目唯一的\ ``html``\ 文件，其他组件都是挂载到这个\ ``div``\ 下面的。其中有个\ ``App.vue``\ ：
+
+|image25|
+
+它叫做根组件，\ ``router-view``\ 是一块区域，用来展示路由匹配到的组件，也就是说所有路由匹配到的组件都会通过\ ``App.vue``\ 根组件来展示。路由配置在\ ``router/index.js``\ 文件中编辑：
+
+|image26|
+
+第一层路由是\ ``/login``\ 登录和\ ``/``\ 首页，首页只有菜单，没有具体内容，显示没有意义，所以重定向到了后台管理的用户管理。第二层路由是具体的功能模块，作为子路由放在首页路由下，比如后台管理。后台管理的子模块用户管理也放到了后台管理的子路由，根据\ ``url``\ 访问路径定义父子路由关系。
+
+为了在未登录的情况下，不允许访问首页，需要再加上访问拦截：
+
+|image27|
+
+同时添加了\ ``meta.requireAuth``\ ，用来设置哪些路由需要拦截，这里把首页设置为\ ``True``\ ：
+
+|image28|
+
+登录就不需要了。路由配置完成了，接着编写页面代码，Vue项目的页面只有\ ``index.html``\ 一个\ ``html``\ 文件，其他页面都是放在\ ``views``\ 文件夹下，新建一个\ ``views/login/index.vue``\ 文件：
+
+|image29|
+
+使用\ ``el-form``\ 标签添加用户名、密码、忘记密码和登录按钮。\ ``:model``\ 给表单绑定了数据对象，分别填充到\ ``form.username``\ 、\ ``form.password``\ 、\ ``form.rememberMe``\ ：
+
+|image30|
+
+``:rules``\ 定义了表单规则，比如是否必填：
+
+|image31|
+
+   登录没有做用户名和密码校验，新增用户时才会做校验。
+
+在创建登录界面时，从\ ``localStorage``\ 中移除\ ``userInfo``\ 和\ ``token``\ ，登录信息保留7天：
+
+|image32|
+
+点击登录按钮会调用\ ``login``\ 方法，发起登录请求：
+
+|image33|
+
+新建\ ``views/home/index.vue``\ ，编写首页代码：
+
+|image34|
+
+``<router-link>``\ 提供了链接跳转，左上角logo跳转到首页，顶部导航栏根据后端返回的\ ``authList``\ 权限菜单进行显示，因为后台管理只有管理员才能访问。接着编写右上角区域代码：
+
+|image35|
+
+包括修改密码、个人信息和退出登录，为了简单一点，没有弄头像了。修改密码使用\ ``el-dialog``\ 做了个弹出框：
+
+|image36|
+
+包括当前密码、新密码、确认新密码。并添加了校验规则：
+
+|image37|
+
+修改密码会调用\ ``/users/passwords/set``\ 接口：
+
+|image38|
+
+同时初始化菜单权限，从后端获取\ ``authList``\ ，并判断是否有权限，没有权限的话跳转到登录页面：
+
+|image39|
+
+首页除了左上角logo，顶部导航栏，右上角个人信息，还有一个重要的版块就是左侧菜单。由于有了顶部导航栏，左侧菜单如果也放到首页来写，由于层级关系会让代码显得很臃肿，所以菜单是放到每个子模块来做的。每个子模块有左侧菜单，也会存在很多重复容易的代码，为了复用，就抽成组件，放到\ ``components``\ 文件夹下：
+
+|image40|
+
+用到了\ ``el-menu``\ 标签：
+
+|image41|
+
+``slot``\ 是个插槽，相当于挖个坑在这，用的时候填一下坑，类似于模板。然后用\ ``el-breadcrumb``\ 做了个面包屑，点击可跳转到相应路由。接着就把左侧菜单应用到后台管理模块上，新建\ ``views/console/index.vue``\ ：
+
+|image42|
+
+左侧菜单搞定了，右侧内容也是类似的，查询、表格、分页、增删改查，也需要抽成组件：
+
+|image43|
+
+|image44|
+
+再新建\ ``views/console/userManagement.vue``\ ，编写用户管理代码：
+
+|image45|
+
+用到了\ ``el-form``\ 和\ ``el-table``\ 标签。表格数据通过\ ``:data``\ 绑定到了\ ``tableData``\ 对象，调用后端接口后，从响应中拿数据填充：
+
+|image46|
+
+新增用户弹窗的入口也是放在这个文件中的：
+
+|image47|
+
+``dialogFormVisible``\ 默认为\ ``False``\ 不可见，点击新增按钮后，会设置为\ ``True``\ 。新建\ ``views/console/addUser.vue``\ 文件编写用户弹窗的代码：
+
+|image48|
+
+用户管理\ ``userManagement.vue``\ 和新增用户\ ``addUser.vue``\ 这两个组件叫做父子组件，父组件如果想传值给子组件，需要通过\ ``props``\ 来实现：
+
+|image49|
+
+``watch``\ 能监视传值的状态，及时渲染。
+
+   ``watch``\ 不是必须的，等到做编辑用例和用例运行结果的时候，会更加体会到它的作用。
+
+新增用户时，会对用户名和密码做校验：
+
+|image50|
+
+``nameValidator``\ 和\ ``pwdValidator``\ 是公共方法，定义在\ ``utils/const.js``\ 文件中：
+
+|image51|
+
+``utils``\ 文件夹下还有个\ ``commonMethods.js``\ 文件，定义了一些公共\ ``js``\ 方法：
+
+|image52|
+
+本次前端代码基本编写完成了：
+
+|image53|
+
+最后还有个\ ``axios.js``\ ，它定义了异步请求实例：
+
+|image54|
+
+添加了一个请求拦截器：
+
+|image55|
+
+校验\ ``header``\ 需要包括\ ``jwt``\ 请求头：\ ``Authorization: Bearer``\ 。还添加了一个响应拦截器：
+
+|image56|
+
+对错误信息进行捕获并弹框提示。
+
+创建Django项目
+--------------
+
+安装Django：
+
+.. code:: shell
+
+   pip install --default-timeout=6000 -i https://pypi.tuna.tsinghua.edu.cn/simple django
+
+创建\ ``teprunner-backend``\ 项目：
+
+.. code:: shell
+
+   django-admin startproject teprunnerbackend
+
+..
+
+   项目名字请随意。
+
+注意这条命令的项目名字不能带短横线\ ``-``\ ，如果想用短横线，可以先去掉短横线执行命令，再手动改回来，外层这个名字对项目没有任何影响：
+
+|image57|
+
+编写Django代码
+--------------
+
+安装依赖包：
+
+.. code:: shell
+
+   pip install --default-timeout=6000 -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+
+|image58|
+
+创建\ ``user``\ 应用:
+
+.. code:: shell
+
+   django-admin startapp user
+
+|image59|
+
+配置\ ``teprunnerbackend/settings.py``:
+
+|image60|
+
+``django-cors-headers``\ 为Django提供了跨域访问的解决方案，需要配置\ ``ALLOWED_HOSTS``\ 为\ ``*``\ ，允许所有域访问，并注册\ ``INSTALLED_APPS``\ 和\ ``MIDDLEWARE``\ 。\ ``user``\ 应用也需要在\ ``INSTALLED_APPS``\ 注册后才会生效。继续改配置，把时区改为\ ``Asia/Shanghai``\ ：
+
+|image61|
+
+继续：
+
+|image62|
+
+Django自带了一个权限管理系统，为了简单一点，直接复用。不过需要对\ ``user``\ 表进行自定义改造，所以通过配置里面的\ ``AUTH_USER_MODEL``\ 指定为刚刚创建的\ ``user``\ 应用的\ ``User``\ 。\ ``REST_FRAMEWORK``\ 是Django
+RESTful
+framework的配置项，同样要进行自定义改造，所以这里通过配置\ ``DEFAULT_AUTHENTICATION_CLASSES``\ 指定认证鉴权类为\ ``CustomJSONWebTokenAuthentication``\ ，通过\ ``EXCEPTION_HANDLER``\ 指定异常处理函数为\ ``custom_exception_handler``\ ，通过\ ``DEFAULT_PAGINATION_CLASS``\ 指定分页类为\ ``CustomPagination``\ 。\ ``JWT_AUTH``\ 是\ ``jwt``\ 的配置项，定义了过期时间为30天，允许刷新，刷新间隔，响应处理，\ ``header``\ 前缀。最后补充了\ ``django-cors-headers``\ 的3个配置。
+
+接着配置\ ``teprunnerbackend/urls.py``\ ：
+
+|image63|
+
+把\ ``user``\ 的\ ``url``\ 都添加到\ ``api/users/``\ 下面。新建\ ``user/urls.py``\ 文件：
+
+|image64|
+
+分别添加登录、用户增删改查、重置密码、角色列表、修改密码几个路径。Django的视图有两个类型：类视图和函数视图。\ ``path()``\ 只接受可调用对象，所以类视图需要使用\ ``as_view()``\ 进行转化，比如\ ``views.UserLogin.as_view()``\ 。函数视图直接写上函数名就可以了，比如\ ``views.update_password``\ 。
+
+打开\ ``user/models.py``\ 文件，添加数据模型：
+
+|image65|
+
+``model``\ 建立了代码和数据库的映射，这称为\ ``orm``\ ，对象关系映射。基础表定义了共有的\ ``created_at``\ 和\ ``updated_at``\ 字段。\ ``auto_now_add``\ 表示记录新增时间，\ ``auto_now``\ 表示记录更新时间，都是自动进行，无需手动写代码来处理。用户表继承了Django自带的\ ``AbstractUser``\ ，\ ``REQUIRED_FIELDS``\ 规定了哪些字段必填，\ ``username``\ 和\ ``password``\ 是隐式规定了必填的，不需要设置，默认\ ``email``\ 也是必填，这里把它去掉。
+
+   Django默认表名会加上\ ``django_``\ 前缀，使用\ ``Meta.db_table``\ 来定义没有前缀的表名。
+
+``model``\ 写完了，执行以下命令同步到数据库中，创建表结构：
+
+.. code:: shell
+
+   python manage.py makemigrations
+   python manage.py migrate
+
+打开\ ``SQLiteStudio``\ ，选择根目录的\ ``db.sqlite3``\ 文件：
+
+|image66|
+
+看到表结构已经创建好了：
+
+|image67|
+
+``Role``\ 有个\ ``models.JSONField``\ 字段，为\ ``菜单权限JSON``\ ，使用Django的\ ``fixtures``\ 给项目添加初始化数据：
+
+|image68|
+
+``fixtures``\ 名字是固定的，就像pytest的\ ``conftest.py``\ 一样，只认这个名字。\ ``user.json``\ 存放数据：
+
+|image69|
+
+包括管理员用户、角色权限、管理员角色对照关系。其中角色权限数据共3条：
+
+|image70|
+
+``auth``\ 里面定义了菜单，对应首页的顶部导航栏的栏目，比如本文只添加了后台管理。\ ``access``\ 表示角色是否有权限访问，只有管理员的这条数据，\ ``access``\ 为\ ``true``\ 。通过以下命令把这些数据写入数据库中：
+
+.. code:: shell
+
+   python manage.py loaddata user
+
+..
+
+   Django会在\ ``user.fixtures``\ 目录下自动找名字为\ ``user``\ 的\ ``.json``\ 、\ ``.xml``\ 或\ ``.yaml``\ 文件进行加载。
+
+接着新建一个\ ``user/serializers.py``\ 文件写序列化的代码。Django序列化是指，把数据库的数据转化为\ ``json``\ 返回给前端，反序列化是指把前端传过来的\ ``json``\ 写入数据库。先写登录的序列化器：
+
+|image71|
+
+继承自\ ``serializers.ModelSerializer``\ ，一般需要在\ ``Meta``\ 定义两个属性，\ ``model``\ 指定相应的模型，\ ``fields``\ 指定所需要的的字段，这些字段就是\ ``json``\ 的\ ``key``\ 。图中的\ ``roleName``\ 不属于\ ``User``\ 表的字段，所以通过定义为\ ``serializers.SerializerMethodField()``\ ，再定义\ ``get_roleName()``\ 方法来取。\ ``serializer``\ 写好后，写视图，编辑\ ``user/views.py``\ ：
+
+|image72|
+
+由于是\ ``jwt``\ 认证，所以这里继承了\ ``JSONWebTokenAPIView``\ ，提取请求参数，\ ``check_password()``\ 简单校验了下请求的密码和数据库的密码\ ``hash``\ 值是否相等，后面的代码是\ ``JSONWebTokenAPIView.post``\ 方法现成的，重写了一遍。\ ``ErrInvalidPassword``\ 等是在\ ``user/errors.py``\ 定义的错误响应：
+
+|image73|
+
+   这样可读性会更高。响应状态码也建议这么写\ ``status=status.HTTP_500_INTERNAL_SERVER_ERROR``\ ，\ ``from rest_framework import status``\ 已经定义好了所有状态码的常量。
+
+新建\ ``user/utils.py``\ 文件，编写\ ``jwt_response_payload_handler``\ 来定义登录接口的响应结构：
+
+|image74|
+
+返回\ ``token``\ 、\ ``user``\ 、\ ``auth``\ 三个字段。\ ``custom_exception_handler``\ 规范了一下异常响应信息。这2个方法都是在\ ``settings.py``\ 中的\ ``REST_FRAMEWORK``\ 配置过的，还有一项配置是分页，新建\ ``user/pagination.py``\ 文件：
+
+|image75|
+
+继承了\ ``PageNumberPagination``\ ，指定了查询参数名\ ``page``\ 、\ ``perPage``\ ，自定义了响应字段名\ ``currentPage``\ 、\ ``items``\ 、\ ``totalNum``\ 、\ ``totalPage``\ ，并添加了2个字段\ ``hasNext``\ 和\ ``hasPrev``\ 。
+
+最后还有一个配置项，自定义认证鉴权，新增\ ``user/authentications.py``\ ：
+
+|image76|
+
+继承了\ ``BaseJSONWebTokenAuthentication``\ 。通过\ ``get_authorization_header``\ 提取请求头中的\ ``Authorization``\ 字段，没有就提示“缺失JWT请求头”。后面的代码是父类现成的。
+
+至此，整个后端基本代码都写完了，\ ``jwt``\ 认证也做好了：
+
+|image77|
+
+后面的代码就集中在\ ``serializers.py``\ 和\ ``views.py``\ 两个文件，序列化器提供数据库表字段和响应\ ``json``\ 的序列化和反序列化，视图使用序列化器，编写业务处理代码。按照这个思路，编写用户的增删改查功能，先在\ ``serializers.py``\ 文件中写2个序列化器\ ``UserCreateSerializer``\ 和\ ``UserPagingSerializer``\ ：
+
+|image78|
+
+由于新增用户和用户列表展示的字段不一样，所以给同一个\ ``User``\ 模型创建了2个序列化器。图中标红了代码是把\ ``int``\ 的\ ``id``\ 值转化为了\ ``str``\ 类型，方便前端处理。\ ``is_staff``\ 表示是否为管理员，这个名字是Django定的。再写\ ``views.py``\ ：
+
+|image79|
+
+``GenericViewSet``\ 是Django REST
+framework提供了超级封装的类视图，一般不需要重写，给\ ``queryset``\ 和\ ``serializer_class``\ 赋值就可以了。不过因为有些自定义规则，所以本项目进行了复写。\ ``permission_classes``\ 指定了接口访问权限，\ ``IsAdminUser``\ 表示必须管理员才能访问，也是Django定义好的，和前面的\ ``is_staff``\ 相对应：
+
+|image80|
+
+类似的，我在\ ``user/permissions.py``\ 新建了个\ ``IsTester``\ ，用来控制某些功能只能测试使用：
+
+|image81|
+
+   本文还用不到这个。
+
+重写查询用户列表\ ``list``\ 方法：
+
+|image82|
+
+增加\ ``username``\ 和\ ``nickname``\ 的模糊查询。
+
+重写新增用户\ ``create``\ 方法：
+
+|image83|
+
+首先写\ ``user``\ 表，根据角色名是否包含管理员，判断是否写\ ``is_staff``\ 字段，接着用入库后产生的\ ``user_id``\ 写\ ``user_role``\ 表。注意最后一行的\ ``status``\ ，新增的话，状态码返回\ ``201``\ 。
+
+重写修改用户的\ ``put``\ 方法：
+
+|image84|
+
+和新增用户的区别在于，更新\ ``user_role``\ 表数据时，需要根据老角色和新角色，比较差异后，添加新增的，删除废旧的。
+
+重写删除用户的\ ``delete``\ 方法：
+
+|image85|
+
+同时删除\ ``user``\ 表和\ ``user_role``\ 表。注意最后一行的\ ``status``\ ，删除的话，状态码返回\ ``204``\ 。
+
+另外还自定义了\ ``user_detail``\ 方法，返回单个用户信息：
+
+|image86|
+
+``GenericViewSet``\ 的这些请求方法在\ ``user/urls.py``\ 文件中配置映射关系：
+
+|image87|
+
+``<int:pk>``\ 定义了\ ``url``\ 中的整形参数，\ ``pk``\ 为变量名，通过\ ``kwargs["pk"]``\ 来取。
+
+在新增用户的时候，需要从角色列表中选择角色，需要后端提供这样的接口，使用\ ``ListAPIView``\ ：
+
+|image88|
+
+4行代码搞定一个接口，这就是Django的好处，除了\ ``ListAPIView``\ ，还有\ ``CreateAPIView``\ 、\ ``RetrieveAPIView``\ 、\ ``ListCreateAPIView``\ 等，按需取用。
+
+密码重置接口用\ ``APIView``\ 来实现：
+
+|image89|
+
+定义了\ ``put``\ 方法，从请求\ ``url``\ 中获取参数值\ ``user_id``\ ，查询\ ``user``\ 对象后，调用预置的\ ``set_password``\ 方法，把密码重置为\ ``qa123456``\ 。记得调用\ ``user.save()``\ 把数据更新到数据库。
+
+除了类视图，Django也提供了函数视图，并且Django REST
+framework提供了函数视图的方法装饰器，可以像\ ``flask``\ 框架一样，感受写纯后端接口的体验，按这个方法来写修改密码接口：
+
+|image90|
+
+``@api_view(['PUT'])``\ 是Django REST
+framework提供的方法装饰器。修改密码时，会对\ ``jwt``\ 进行解码，获取到\ ``user_id``\ ，然后检查老密码是否和数据库中的密码\ ``hash``\ 值一致。
+
+前后端联调
+----------
+
+根据以上思路把前后端的代码写完以后，就可以把项目跑起来看看效果了。先启动Django项目：
+
+.. code:: shell
+
+   python manage.py runserver
+
+接着启动Vue项目：
+
+.. code:: shell
+
+   npm run serve
+
+访问：
+
+http://localhost:8080/
+
+就能看到登录页面了，默认超管用户名为\ ``admin``\ ，密码为\ ``qa123456``\ ，登录成功后可以尝试走一遍功能检查下：
+
+1.  点击左上角logo，不会出现跳转到空白页。
+2.  点击右上角信息，弹出下拉菜单，分别有修改密码、个人信息、退出登录。
+3.  点击退出，返回登录页，重新登录。
+4.  查询右上角个人信息，包括用户名、昵称、角色。
+5.  通过右上角下拉菜单修改密码，和老密码不匹配会提示修改失败，填写正确信息会修改成功，自动跳转到登录页面重新登录。输入老密码登录失败，输入新密码登录成功。
+6.  新增用户，保持默认密码，新增成功后，用\ ``qa123456``\ 登录成功。
+7.  新增用户，选择自定义密码，新增成功后，用\ ``qa123456``\ 登录失败，用自定义密码登录成功。
+8.  新增用户，分别创建管理员、开发、测试3个角色用户。
+9.  使用新用户登录，管理员用户能登录成功，开发和测试由于没有后台管理权限，点击登录接口后会提示“无菜单权限”。
+10. 修改用户，修改用户名、密码，修改测试角色用户为管理员角色，重新登录，能看到用户名、密码已更新为修改后的用户名、密码，并且管理员角色生效，能登进去看到后台管理功能。
+11. 输入用户名或昵称，点击搜索按钮，测试模糊查询功能正常，重置后清空搜索框，自动查询一次列表。
+12. 点击删除按钮，提示是否确认删除，确认后删除成功，检查数据库\ ``user_role``\ 表数据也被清理干净。
+13. 切换分页，刷新列表，选择不同分页条数，正常计算显示相应的分页总数。
+14. 找到自定义密码的用户，点击重置密码，重置成功后，重新登录，使用自定义密码登录失败，使用默认密码\ ``qa123456``\ 登录成功。
+15. 点击左侧菜单旁边的面包屑按钮，能收起和展开左侧菜单。
+
+..
+
+   由于时间关系，目前还没有做角色管理功能，角色通过后端Django的\ ``fixtures/user.json``\ 进行数据初始化。
+
+Postman搭建Mock Server
+----------------------
+
+在写前端代码过程中，后端还没有写好，可以找一个服务模拟后端，提供响应数据进行前端调试，这项技术叫做Mock，这个服务称为Mock
+Server。Mock
+Server可以使用JavaScript的\ ``mock.js``\ 来搭建，也可以使用Python的\ ``FastAPI``\ ，不嫌麻烦用\ ``Spring Boot``\ 或者\ ``Nginx``\ 做一个也可以。不过为了方便起见，选择上手就能用的可以省不少心。一些网站会提供在线Mock服务，在网站上填写\ ``url``\ 和\ ``response body``\ ，有个缺点是我找了一圈都没有发现能设置响应状态码的，比如在调试\ ``axios.js``\ 的响应拦截器时，就需要根据\ ``404``\ 、\ ``500``\ 来进行调试，看效果。寻寻觅觅，发现平时都在用的Postman，直接可以做Mock
+Server。首先登陆Postman，只有登陆后才能使用这个功能：
+
+|image91|
+
+可以选择用Google账号登陆，也可以注册一个。点击左上角\ ``+ New``\ ：
+
+|image92|
+
+选择\ ``Mock Server``\ 。依次填写请求方法、请求路径、响应状态码、响应体：
+
+|image93|
+
+点击表格右上角的三个点还能添加请求体和接口描述：
+
+|image94|
+
+接着点击下一步：
+
+|image95|
+
+填写Mock
+Server的名字为\ ``hello``\ ，其他选项默认，点击\ ``Create Mock Server``\ 进行创建：
+
+|image96|
+
+关闭后，Mock Server就建好了：
+
+|image97|
+
+接着从左侧\ ``Collections``\ 中找到这个接口，点击打开：
+
+|image98|
+
+此时还不能发送请求，需要在右上角选择环境\ ``hello``\ ：
+
+|image99|
+
+发送请求成功：
+
+|image100|
+
+其中\ ``url``\ 是隐藏了的，点击右上角环境旁边的眼睛图标查看：
+
+|image101|
+
+修改已创建接口mock数据的入口在\ ``Examples``\ ：
+
+|image102|
+
+点击\ ``Default``\ ：
+
+|image103|
+
+提供了新增时更直观的操作界面，比如我把响应状态码改成了\ ``404``\ ，响应体改成了\ ``{"msg": "hello not found"}``\ ，点击右上角\ ``Save Example``\ 保存后，再次请求：
+
+|image104|
+
+实际mock的状态码和响应体也更新了。
+
+小结
+----
+
+本文是学习版pytest内核测试平台开发的入门篇，内容比较充实，全文字数上万，一共截了103张图，借助\ ``FastStone Capture``\ 这个小工具，还算轻松，希望能让读者更直观的看到平台功能和代码逻辑。“编写Vue代码”和“编写Django代码”2个小节的内容是一气呵成写完的，没有做修改，怕改了之后反而影响行文思路，不够畅快。前端项目参考了一些开源项目如\ ``Tcloud``\ 、\ ``FasterRunner``\ 等，把代码看懂后，自己重新组织了代码和规范，在调试过程中，也学会了写Vue，做学习版\ ``teprunner``\ 时就从头写了一遍。后端代码完全是我自己写的，先学了一遍Django和Django
+REST
+framework官方教程，其中《Django认证系统并不鸡肋反而很重要》这篇文章在腾讯云+社区2020年度征文活动中，被评选为了最受喜爱作者奖，如果对Django认证系统不是很清楚的话，可以看看。最后，个人水平有限，有错误或不足之处，还请见谅。虽然测试平台不一定能完全落地，但是做一遍开发对能力的提升是极大的。\ ``teprunner``\ 并不算优秀平台，和真正企业级项目比起来，就是个小玩具。如果能博君一乐，也算是体现价值了。
+
+   参考资料：
+
+   源码前端 https://github.com/dongfanger/teprunner-frontend
+
+   源码后端 https://github.com/dongfanger/teprunner-backend
+
+   个人博客 https://dongfanger.gitee.io/blog/
+
+.. |image1| image:: ../wanggang.png
+.. |image2| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306090248863.png
+.. |image3| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304180738292.png
+.. |image4| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304180813476.png
+.. |image5| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304180834964.png
+.. |image6| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304180922929.png
+.. |image7| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210305085858572.png
+.. |image8| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304180948635.png
+.. |image9| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304181008401.png
+.. |image10| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304181055775.png
+.. |image11| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304181112261.png
+.. |image12| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304181143186.png
+.. |image13| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304181206729.png
+.. |image14| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304213603156.png
+.. |image15| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210305124737919.png
+.. |image16| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306140431231.png
+.. |image17| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306142926468.png
+.. |image18| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306144255241.png
+.. |image19| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210305095937989.png
+.. |image20| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210305100051047.png
+.. |image21| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307072940767.png
+.. |image22| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306144657713.png
+.. |image23| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306145108245.png
+.. |image24| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306145301713.png
+.. |image25| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306145518745.png
+.. |image26| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306155800462.png
+.. |image27| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306160650302.png
+.. |image28| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306160844577.png
+.. |image29| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306161200994.png
+.. |image30| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306161445594.png
+.. |image31| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306161512988.png
+.. |image32| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306161719636.png
+.. |image33| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306161951064.png
+.. |image34| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306162302099.png
+.. |image35| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306162558208.png
+.. |image36| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306162723461.png
+.. |image37| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306162836437.png
+.. |image38| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306162952412.png
+.. |image39| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306163723278.png
+.. |image40| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306164108392.png
+.. |image41| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306164218151.png
+.. |image42| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306164649177.png
+.. |image43| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306164954122.png
+.. |image44| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306165236756.png
+.. |image45| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306165536649.png
+.. |image46| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306165655643.png
+.. |image47| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306165925367.png
+.. |image48| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306170204228.png
+.. |image49| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306170335128.png
+.. |image50| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306171236501.png
+.. |image51| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306171637315.png
+.. |image52| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306171736326.png
+.. |image53| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306171934196.png
+.. |image54| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306172105879.png
+.. |image55| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306172149351.png
+.. |image56| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306172302154.png
+.. |image57| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210304233802571.png
+.. |image58| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306173835344.png
+.. |image59| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306174151316.png
+.. |image60| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306173916888.png
+.. |image61| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306174233580.png
+.. |image62| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306174304327.png
+.. |image63| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306175004740.png
+.. |image64| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306181212407.png
+.. |image65| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306181627980.png
+.. |image66| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306204628547.png
+.. |image67| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306204721167.png
+.. |image68| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306205247149.png
+.. |image69| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306205357170.png
+.. |image70| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306205523009.png
+.. |image71| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306210247811.png
+.. |image72| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306213523293.png
+.. |image73| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306214715768.png
+.. |image74| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306213902276.png
+.. |image75| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306214224740.png
+.. |image76| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306215729007.png
+.. |image77| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306215415165.png
+.. |image78| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306220633866.png
+.. |image79| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306221040923.png
+.. |image80| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306221332755.png
+.. |image81| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306221618430.png
+.. |image82| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306222004255.png
+.. |image83| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306222230439.png
+.. |image84| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306222542791.png
+.. |image85| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306222849363.png
+.. |image86| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306223059140.png
+.. |image87| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306223155180.png
+.. |image88| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306223407616.png
+.. |image89| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306223625706.png
+.. |image90| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210306223944635.png
+.. |image91| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307081648583.png
+.. |image92| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307081809305.png
+.. |image93| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307083024981.png
+.. |image94| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307082202812.png
+.. |image95| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307082306604.png
+.. |image96| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307082424949.png
+.. |image97| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307082635515.png
+.. |image98| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307083150463.png
+.. |image99| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307083317580.png
+.. |image100| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307083359324.png
+.. |image101| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307083509730.png
+.. |image102| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307083835208.png
+.. |image103| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307083935109.png
+.. |image104| image:: 001002-【开源平台】学习版pytest内核测试平台开发万字长文入门篇/image-20210307084138020.png

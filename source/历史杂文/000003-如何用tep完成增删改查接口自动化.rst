@@ -1,0 +1,308 @@
+如何用tep完成增删改查接口自动化
+===============================
+
+|image1|
+
+tep的设计理念是让人人都可以用Python写自动化，本文就来介绍如何用tep完成增删改查接口自动化。
+
+环境变量
+--------
+
+编辑\ ``fixtures/fixture_admin.py``\ ：
+
+.. code:: python
+
+   "qa": {
+       "domain": "https://qa.com",
+   },
+
+修改\ ``qa``\ 环境的\ ``domain``\ 。
+
+登录
+----
+
+因为非登录接口需要从登录接口拿\ ``token``\ ，放在请求参数中，所以先在\ ``fixtures/fixture_admin.py``\ 中实现登录，修改\ ``url``\ 和\ ``json``\ ：
+
+.. code:: python
+
+   response = request(
+       "post",
+       url=url("/api/users/login"),
+       headers={"Content-Type": "application/json"},
+       json={
+           "username": "admin",
+           "password": "123456",
+       }
+   )
+
+根据实际响应数据结构，修改\ ``response_token``\ 赋值：
+
+.. code:: python
+
+   response_token = jmespath.search("token", response.json())
+
+   class Clazz:
+           token = response_token
+           jwt_headers = _jwt_headers(response_token)
+
+   return Clazz
+
+参考\ ``_jwt_headers()``\ 实现自定义headers：
+
+.. code:: python
+
+   def _jwt_headers(token):
+       return {"Content-Type": "application/json", "authorization": f"Bearer {token}"}
+
+..
+
+   ``_``\ 表示内部函数，外部无法访问，遵循\ ``conftest.py``\ 只对外提供fixture的原则。
+
+**完整代码**
+
+.. code:: python
+
+   def _jwt_headers(token):
+       return {"Content-Type": "application/json", "authorization": f"Bearer {token}"}
+
+
+   @pytest.fixture(scope="session")
+   def login():
+       # Code your login
+       logger.info("Administrator login")
+       response = request(
+           "post",
+           url=url("/api/users/login"),
+           headers={"Content-Type": "application/json"},
+           json={
+               "username": "admin",
+               "password": "123456",
+           }
+       )
+       assert response.status_code < 400
+       response_token = jmespath.search("token", response.json())
+
+       class Clazz:
+           token = response_token
+           jwt_headers = _jwt_headers(response_token)
+
+       return Clazz
+
+说明：
+
+2. 可以复制\ ``login``\ 为多个fixture，如\ ``login_admin``\ 、\ ``login_some_user``\ ，灵活运用。
+3. ``scope="session"``\ ，表示只登录一次，所有测试用例使用同一个\ ``token``\ 。可以改为\ ``function``\ ，让每条用例使用不同\ ``token``\ 。
+
+写用例
+------
+
+新建测试
+~~~~~~~~
+
+新建\ ``tests\crud_test.py``\ ：
+
+.. code:: python
+
+   from loguru import logger
+   from tep.client import request
+
+
+   def test(faker_ch, login, url):
+
+pytest的fixture作为参数传入\ ``test()``\ 函数来使用，\ ``faker_ch``\ 、\ ``login``\ 、
+``url``\ 是\ ``fixture_admin.py``\ 中定义好的fixture。
+
+-  ``from loguru import logger`` 用于在测试用例中打印日志
+-  ``from tep.client import request``
+   tep封装了请求日志功能，也可以用原生\ ``from requests import request``
+
+新增
+~~~~
+
+请求参数为\ ``nickname``\ 和\ ``phone``\ ，使用\ ``faker_ch``\ 造1条测试数据：
+
+.. code:: python
+
+   fake = faker_ch
+   nickname = fake.name()
+   phone = fake.phone_number()
+
+请求方法为\ ``post``\ ，headers取登录返回值\ ``login.jwt_headers``\ ：
+
+.. code:: python
+
+   response = request(
+       "post",
+       url=url("/api/users"),
+       headers=login.jwt_headers,
+       json={
+           "nickname": nickname, "phone": phone
+       }
+   )
+
+添加断言，简单判断下响应状态码<400：
+
+.. code:: python
+
+   assert response.status_code < 400
+
+..
+
+   也可以查数据库来断言。
+
+提取修改接口需要的数据：
+
+.. code:: python
+
+   user_id = jmespath.search("id", response.json())
+   created_at = jmespath.search("createdAt", response.json())
+   updated_at = jmespath.search("updatedAt", response.json())
+
+..
+
+   推荐用jmespath来提取json。
+
+查询
+~~~~
+
+请求参数传入刚才定义的局部变量\ ``nickname``\ ，使用\ ``get``\ 请求并断言，headers取登录返回值\ ``login.jwt_headers``\ ：
+
+.. code:: python
+
+   response = request(
+       "get",
+       url=url("/api/users"),
+       headers=login.jwt_headers,
+       params={
+           "page": 1,
+           "perPage": 10,
+           "keyword": nickname
+       }
+   )
+   assert response.status_code < 400
+
+..
+
+   get请求需要把\ ``json``\ 关键字改为\ ``params``\ 。
+
+修改
+~~~~
+
+使用faker再造1条新数据：
+
+.. code:: python
+
+   nickname_new = fake.name()
+   phone_new = fake.phone_number()
+
+请求方法为\ ``put``\ ，headers取登录返回值\ ``login.jwt_headers``\ ：
+
+.. code:: python
+
+   response = request(
+           "put",
+           url=url(f"/api/users/{user_id}"),
+           headers=login.jwt_headers,
+           json={
+               "id": user_id, "createdAt": created_at, "updatedAt": updated_at,
+               "phone": phone_new, "nickname": nickname_new
+           }
+       )
+   assert response.status_code < 400
+
+请求参数中用到了新增接口提取的数据\ ``user_id``\ 、\ ``created_at``\ 、\ ``updated_at``\ 。
+
+删除
+~~~~
+
+请求方法为\ ``delete``\ ，\ ``url``\ 中传入\ ``user_id``\ ，headers取登录返回值\ ``login.jwt_headers``\ ：
+
+.. code:: python
+
+   response = request(
+       "delete",
+       url=url(f"/api/users/{user_id}"),
+       headers=login.jwt_headers
+   )
+   assert response.status_code < 400
+
+..
+
+   删除接口没有json和params。
+
+完整用例
+--------
+
+.. code:: python
+
+
+   """
+   @Author  :  Don
+   @Date    :  12/25/2020 1:02 PM
+   @Desc    :  增删改查
+   """
+   import jmespath
+   from loguru import logger
+   from tep.client import request
+
+
+   def test(faker_ch, login, url):
+       fake = faker_ch
+       logger.info("新增")
+       nickname = fake.name()
+       phone = fake.phone_number()
+       response = request(
+           "post",
+           url=url("/api/users"),
+           headers=login.jwt_headers,
+           json={
+               "nickname": nickname, "phone": phone
+           }
+       )
+       assert response.status_code < 400
+       user_id = jmespath.search("id", response.json())
+       created_at = jmespath.search("createdAt", response.json())
+       updated_at = jmespath.search("updatedAt", response.json())
+
+       logger.info("查询")
+       response = request(
+           "get",
+           url=url("/api/users"),
+           headers=login.jwt_headers,
+           params={
+               "page": 1,
+               "perPage": 10,
+               "keyword": nickname
+           }
+       )
+       assert response.status_code < 400
+
+       logger.info("修改")
+       nickname_new = fake.name()
+       phone_new = fake.phone_number()
+       response = request(
+           "put",
+           url=url(f"/api/users/{user_id}"),
+           headers=login.jwt_headers,
+           json={
+               "id": user_id, "createdAt": created_at, "updatedAt": updated_at,
+               "phone": phone_new, "nickname": nickname_new
+           }
+       )
+       assert response.status_code < 400
+       logger.info(f"用户姓名手机 {nickname} {phone} 修改后 {nickname_new} {phone_new}")
+
+       logger.info("删除")
+       response = request(
+           "delete",
+           url=url(f"/api/users/{user_id}"),
+           headers=login.jwt_headers
+       )
+       assert response.status_code < 400
+
+小结
+----
+
+本文介绍了tep的基本使用，先配置环境变量，再修改登录代码，然后新增测试，最后编写增删改查的接口请求。每条用例放在一个函数中，通过函数参数引用fixture来使用全局环境变量，函数内部可以定义测试需要的局部变量。每个接口是一个代码块，由接口描述、测试数据、请求、断言和数据提取5部分组成。接口之间通过变量实现参数化和关联。
+
+.. |image1| image:: ../wanggang.png

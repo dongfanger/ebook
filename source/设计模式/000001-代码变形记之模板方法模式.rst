@@ -1,0 +1,246 @@
+代码变形记之模板方法模式
+========================
+
+|image1|
+
+《代码变形记》系列文章基于真实案例，记录实际工作中的代码优化方法。
+
+背景
+----
+
+有5类数据A、B、C、D、E，需要分别进行处理。
+
+优化前
+------
+
+通过ParamBuilder来分别构造各自参数，然后在Runner中分别调用，分别判断。
+
+.. code:: java
+
+   package TemplateMethodPattern.before;
+
+   public class Runner {
+       public static void main(String[] args) {
+           Param param = new Param();
+           ParamBuilder paramBuilder = new ParamBuilder();
+           // 处理数据A
+           boolean result = paramBuilder.buildA(param);
+           if (!result) {
+               return;
+           }
+           boolean inserted = doIt(param);
+           if (!inserted) {
+               return;
+           }
+           // 处理数据B
+           result = paramBuilder.buildB(param);
+           if (!result) {
+               return;
+           }
+           inserted = doIt(param);
+           if (!inserted) {
+               return;
+           }
+           // 处理数据C
+           result = paramBuilder.buildC(param);
+           if (!result) {
+               return;
+           }
+           inserted = doIt(param);
+           if (!inserted) {
+               return;
+           }
+           // 处理数据D
+           result = paramBuilder.buildD(param);
+           if (!result) {
+               return;
+           }
+           inserted = doIt(param);
+           if (!inserted) {
+               return;
+           }
+           // 处理数据E
+           result = paramBuilder.buildE(param);
+           if (!result) {
+               return;
+           }
+           inserted = doIt(param);
+           if (!inserted) {
+               return;
+           }
+       }
+
+       public static boolean doIt(Param param) {
+           return param.flag;
+       }
+   }
+
+.. code:: java
+
+   package TemplateMethodPattern.before;
+
+   import lombok.Data;
+
+   @Data
+   public class Param {
+       public boolean flag;
+   }
+
+.. code:: java
+
+   package TemplateMethodPattern.before;
+
+   public class ParamBuilder {
+       public boolean buildA(Param param) {
+           return true;
+       }
+       public boolean buildB(Param param) {
+           return false;
+       }
+       public boolean buildC(Param param) {
+           return true;
+       }
+       public boolean buildD(Param param) {
+           return false;
+       }
+       public boolean buildE(Param param) {
+           return true;
+       }
+   }
+
+存在问题
+--------
+
+Runner中存在较多重复代码。
+
+优化方法
+--------
+
+模板方法模式，Template Method
+Pattern。将重复代码抽象为一个抽象类，定义多个子类继承并实现各自代码。
+
+优化后
+------
+
+AbstractHandler抽象了重复方法，子类继承后实现build()方法。Runner中调用process()方法来遍历子类对象进行处理。
+
+.. code:: java
+
+   package TemplateMethodPattern.after;
+
+   import TemplateMethodPattern.after.handler.*;
+   import TemplateMethodPattern.before.Param;
+
+   import java.util.Arrays;
+   import java.util.List;
+
+   public class Runner {
+       public static void main(String[] args) {
+           Param param = new Param();
+           List<AbstractHandler> handlers = Arrays.asList(
+                   new AHandler(),
+                   new BHandler(),
+                   new CHandler(),
+                   new DHandler(),
+                   new EHandler()
+           );
+           for (AbstractHandler handler : handlers) {
+               if (!handler.process(param, Runner::doIt)) {
+                   return;
+               }
+           }
+       }
+
+       public static boolean doIt(Param param) {
+           return param.flag;
+       }
+   }
+
+.. code:: java
+
+   package TemplateMethodPattern.after.handler;
+
+   import TemplateMethodPattern.before.Param;
+
+   import java.util.function.Function;
+
+   public abstract class AbstractHandler {
+       protected abstract boolean build(Param param);
+
+       public boolean process(Param param, Function<Param, Boolean> doIt) {
+           boolean result = build(param);
+           if (!result) {
+               return false;
+           }
+           return doIt.apply(param);
+       }
+   }
+
+.. code:: java
+
+   package TemplateMethodPattern.after.handler;
+
+   import TemplateMethodPattern.before.Param;
+
+   public class AHandler extends AbstractHandler{
+       @Override
+       protected boolean build(Param param) {
+           return true;
+       }
+   }
+
+.. code:: java
+
+   package TemplateMethodPattern.after.handler;
+
+   import TemplateMethodPattern.before.Param;
+
+   public class BHandler extends AbstractHandler{
+       @Override
+       protected boolean build(Param param) {
+           return false;
+       }
+   }
+
+.. code:: java
+
+   package TemplateMethodPattern.after.handler;
+
+   import TemplateMethodPattern.before.Param;
+
+   public class CHandler extends AbstractHandler{
+       @Override
+       protected boolean build(Param param) {
+           return true;
+       }
+   }
+
+.. code:: java
+
+   package TemplateMethodPattern.after.handler;
+
+   import TemplateMethodPattern.before.Param;
+
+   public class DHandler extends AbstractHandler{
+       @Override
+       protected boolean build(Param param) {
+           return false;
+       }
+   }
+
+.. code:: java
+
+   package TemplateMethodPattern.after.handler;
+
+   import TemplateMethodPattern.before.Param;
+
+   public class EHandler extends AbstractHandler{
+       @Override
+       protected boolean build(Param param) {
+           return true;
+       }
+   }
+
+个人感想，因为我是从Python转到Java，在使用设计模式解决这个问题后，我也思考了如果使用Python该怎么处理？Python是动态语言，有鸭子类型，对于重复代码通过定义一个公共函数，动态绑定类型就能解决，感兴趣的同学可以试试。不同的语言都各自的优势，也有各自的限制。也有各自的解决方法。
+
+.. |image1| image:: ../wanggang.png

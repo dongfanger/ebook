@@ -1,0 +1,2 @@
+.. figure:: ../README/vip.jpg
+

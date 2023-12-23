@@ -1,0 +1,251 @@
+tep首次开源V0.2.3介绍
+=====================
+
+|image1|
+
+『 tep is a testing tool to help you write pytest more easily. Try Easy
+Pytest! 』
+
+tep前身
+-------
+
+tep的前身是接口自动化测试框架pyface，一款面向对象设计的测试框架，我写过一篇\ `博客 <https://www.cnblogs.com/df888/p/12592716.html>`__\ 介绍。
+
+测试框架 / 测试工具
+-------------------
+
+tep的定位是 ``a testing tool``\ ，不是 ``a testing framework``\ 。
+
+框架/工具，是有区别的。最大的区别，就是我自认为是没有足够的能力去自主开发一套“框架”！工具的能力，还是妥妥的！
+
+自研的框架意味着不稳定，要花很多精力来踩坑填坑，别人不敢随便用的。工具只是站在巨人的肩膀上，出了问题，这个锅我不背！
+
+tep是 ``try easy pytest``
+的首字母缩写，tep的目的是帮助你更简单地写pytest，比如用pytest+requests写接口自动化。
+
+pytest是python的测试框架，很成熟。tep是pytest的测试工具，很简单。
+
+pytest和tep都是开源项目。
+
+设计理念
+--------
+
+很大程度上借鉴了HttpRunner（优秀的框架）。不同的是，tep更着重写python，而不是写YAML文件。
+
+-  简单是更好的
+-  每个人都能用python写自动化
+
+这就是tep的设计理念。
+
+项目结构
+--------
+
+::
+
+   tests
+       __init__.py
+   .gitignore
+   conftest.py
+
+tep提供了快速创建项目的能力，也就是脚手架。执行
+``tep startproject project_name``\ ，就可以创建项目结构，如，这里创建一个demo，
+
+::
+
+   $ tep startproject demo
+   2020-07-28 14:34:57.649 | INFO     | tep.scaffold:create_scaffold:40 - Create new project: demo
+   Project root dir: \PycharmProjects\demo
+
+   Created folder: demo
+   Created folder: demo\tests
+   Created file: demo\tests\__init__.py
+   Created file: demo\conftest.py
+   Created file: demo\.gitignore
+
+tests是一个package，用于存放测试脚本，脚本文件以test_开头或_test结尾，pytest才能识别到。个人喜欢以_test结尾。
+
+conftest.py是一个全局文件，定义全局变量，也可以定义fixture、hook、plugin等，
+
+.. code:: python
+
+   import os
+
+   import pytest
+
+
+   @pytest.fixture(scope="session", autouse=True)
+   def project_cache(request):
+       request.config.cache.set("project_dir", os.path.dirname(os.path.abspath(__file__)))
+
+
+   class Dev:
+       test_url = 'https://dev.com'
+
+
+   class Qa:
+       test_url = 'https://qa.com'
+
+
+   class Release:
+       test_url = 'https://release.com'
+
+
+   # choose environment
+   env = Qa
+
+   # you can define your variables and functions and so on
+
+1 定义了一个fixture，把项目路径保存到pytest缓存中。
+
+2 定义了环境的class，多环境切换，不需要修改测试脚本。
+
+3 自定义内容，比如用户登录token等。
+
+专注于写脚本
+------------
+
+项目结构很清晰。在\ ``conftest.py``\ 进行一些初始化/参数化/清理工作，在\ ``tests/``\ 写测试脚本。
+
+不像pyface那样面向对象的封装，tep更注重平铺写脚本的方式，这样就离“每个人都能用python写自动化”更近一步。毕竟封装之后看着容易晕，我也晕。
+
+去除掉框架的约束，给每个人写python的自由，在测试脚本里你可以尽情发挥你的代码风格，代码能力，千人千面。代价呢，就是代码质量参差不齐。
+
+这又怎么样呢，用过各种开源/自主研发的测试平台，还不是每个人都在写着自己风格的自动化case！
+
+大胆写，能写，写出来，跑通，就已经是在写自动化，就已经是在创造价值了！
+
+tep默认是不会创建 ``reports`` 文件夹的， 原因有二。
+
+其一，如果你是本地执行的话，可以使用 ``--tep-reports``
+自定义命令行参数，来生成测试报告。
+
+::
+
+   $ pytest --tep-reports
+
+测试结束后会在 ``project_dir/reports`` 生成
+``report-2020-07-28``\ 的allure测试报告。
+
+其二，如果你是持续集成的话，如Jenkins，已经提供了allure
+report的插件，配置一下就可以自动生成测试报告，百度\ `“jenkins
+allure” <https://www.baidu.com/s?ie=UTF-8&wd=jenkins%20allure>`__\ 。
+
+附上allure常用命令，
+
+::
+
+   pytest --alluredir=result  # 报告目录，会生成一堆数据文件
+   allure generate result -o html  # 生成html报告
+   allure serve html  # 启动服务
+   allure open html  # 打开报告（直接执行自动启动服务） PyCharm可以右键index.html选择Open in Browser
+
+allure\ `下载地址 <https://github.com/allure-framework/allure2/releases/>`__\ ，下载解压后，把bin绝对路径添加到系统环境变量Path中。allure需要安装jdk。
+
+轻封装
+------
+
+tep尊重原生用法。
+
+requests的封装只通过装饰器做了2个封装，一是记录接口请求响应耗时，二是打印日志。只需要
+``from tep.client import request`` ，就可以和 ``requests.request``
+一样使用了，没有做任何其他的冗余修改。
+
+.. code:: python
+
+   #!/usr/bin/python
+   # encoding=utf-8
+
+   """
+   @Author  :  Don
+   @Date    :  7/25/2020 2:02 PM
+   @Desc    :
+   """
+
+   import decimal
+   import json
+   import time
+
+   import requests
+   import urllib3
+   from loguru import logger
+   from requests import sessions
+
+   from tep.funcs import NpEncoder
+
+   urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+   def request_encapsulate(req):
+       def send(*args, **kwargs):
+           # elapsed
+           start = time.process_time()
+           response = req(*args, **kwargs)
+           end = time.process_time()
+           elapsed = str(decimal.Decimal("%.3f" % float(end - start))) + "s"
+
+           # log
+           try:
+               log4a = {"method": args[0]}
+               for k, v in kwargs.items():
+                   # if not json, str()
+                   try:
+                       json.dumps(v)
+                   except TypeError:
+                       v = str(v)
+                   log4a.setdefault(k, v)
+               log4a.setdefault("status", response.status_code)
+               log4a.setdefault("response", response.text)
+               log4a.setdefault("elapsed", elapsed)
+               logger.info(json.dumps(log4a, ensure_ascii=False, cls=NpEncoder))
+           except AttributeError:
+               logger.error("request failed")
+           except TypeError:
+               logger.warning(log4a)
+
+           return response
+
+       return send
+
+
+   @request_encapsulate
+   def request(method, url, **kwargs):
+       """此处省略1万行代码，没做任何修改，从源码copy过来，只加了个装饰器"""
+
+1 使用 ``time.process_time()`` ，记录了耗时。
+
+2
+打印日志，把请求响应的method、url、headers、参数、响应状态码、响应体、耗时等数据保存到json中，输出控制台。
+
+日志选择用loguru取代logging，\ ``from loguru import logger``
+直接用，不用再管handler了。
+
+-  faker，造数据工具
+-  jmespath，json解析工具
+-  deepdiff，json比较工具
+-  pandas、numpy，数据处理工具
+
+安装tep，自动就把这些开源利器安装上了，无需单独安装。未来会集成更多实用工具到tep中。
+
+tep本身是很轻的。
+
+tep可持续发展
+-------------
+
+我是2014年参加工作的，2018年才开始接触接口测试（汗！），现在有2年多的接口测试经验，其中包括一整年的纯后端接口测试经验。
+
+接口自动化第一次写了接口自动化框架AIM（基于unittest），后来又有pyface，以及中间改造过的各种临时版本。也用过一些开源框架如RobotFramwork、HttpRunner，使用过自研工具，如基于JMeter封装的平台。还有一些网上开源的“web接口自动化平台”，这个我是打个大大的问号的。实用性很差，功能很鸡肋，报错还多。接口自动化测试框架的轮子，造也造不完。
+
+tep“测试工具”的定位完美的避开了所有这些框架的弊端。工具不会定义你如何写自动化脚本，工具只会帮你更好地写自动化脚本。
+
+有理由相信，tep会成长为一款实用的测试工具。
+
+小结
+----
+
+这里安利一波pytest\ `官网教程 <https://docs.pytest.org/>`__\ ，阅读英文文档，才能真正理解作者的意思。学python，写pytest，用tep。测试更专业！
+
+   参考：
+
+   源码 https://github.com/dongfanger/tep
+
+.. |image1| image:: ../wanggang.png

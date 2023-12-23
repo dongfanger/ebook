@@ -1,0 +1,50 @@
+Git比较分支差异的3个命令
+========================
+
+|image1|
+
+查看本地分支
+
+::
+
+   git branch
+
+查看远端分支，无论是否checkout到本地
+
+::
+
+   git branch -r
+
+假如想比较dev和master
+
+命令1：比较文件
+
+::
+
+   git diff dev master --stat
+
+命令2：比较提交日志
+
+::
+
+   git log dev ^master
+
+::
+
+   git log master..dev  # since..until，包含了在dev分支而不在master分支中所有的提交，若无结果，说明dev的所有提交都合到了master
+
+这2种等价。
+
+::
+
+   git log dev...master
+
+dev和master的所有差异，可以加–left-right参数，指明属于哪个分支的commit。
+
+命令3：列出合并到master的分支，master >= dev
+
+::
+
+   git branch --merged master
+
+.. |image1| image:: ../wanggang.png
