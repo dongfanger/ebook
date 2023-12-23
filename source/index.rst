@@ -12,7 +12,8 @@ Contents:
 .. toctree::
    :maxdepth: 2
    :glob:
-   
+
+   chapters/关于本书
    chapters/编程语言
    chapters/设计模式
    chapters/测试工具
@@ -33,7 +34,6 @@ Contents:
    chapters/历史杂文
    更新日志
    付费服务
-   关于本书
 
 --------------
 
